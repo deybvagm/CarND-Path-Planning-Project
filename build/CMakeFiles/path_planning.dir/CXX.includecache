@@ -847,6 +847,10 @@ string
 -
 vector
 -
+map
+-
+math.h
+-
 Eigen-3.3/Eigen/Core
 /home/deyber/CLionProjects/CarND-Path-Planning-Project/src/Eigen-3.3/Eigen/Core
 Eigen-3.3/Eigen/QR
@@ -855,4 +859,26 @@ helpers.h
 /home/deyber/CLionProjects/CarND-Path-Planning-Project/src/helpers.h
 json.hpp
 /home/deyber/CLionProjects/CarND-Path-Planning-Project/src/json.hpp
+spline.h
+/home/deyber/CLionProjects/CarND-Path-Planning-Project/src/spline.h
+
+/home/deyber/CLionProjects/CarND-Path-Planning-Project/src/spline.h
+cstdio
+-
+cassert
+-
+vector
+-
+algorithm
+-
+
+/home/deyber/CLionProjects/CarND-Path-Planning-Project/src/state.cpp
+state.h
+/home/deyber/CLionProjects/CarND-Path-Planning-Project/src/state.h
+
+/home/deyber/CLionProjects/CarND-Path-Planning-Project/src/state.h
+vector
+-
+string
+-
 

@@ -55,21 +55,15 @@ int main() {
     int lane = 1;
 
 
-  /**
-   * START DEYBER CODE TO INCLUDE STATE
-   */
 
   string current_state = "KL";
 
-  /**
-   * END DEYBER CODE
-   */
 
     //  Have a reference velocity to target
     double ref_vel = 0.0; //mph
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
-               &map_waypoints_dx,&map_waypoints_dy, &ref_vel, &lane]
+               &map_waypoints_dx,&map_waypoints_dy, &ref_vel, &lane, &current_state]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                uWS::OpCode opCode) {
 
@@ -119,6 +113,8 @@ int main() {
            *   sequentially every .02 seconds
            */
 
+          const double MAX_ACCELERATION = .224; // m/s2
+
           int prev_size = previous_path_x.size();
 
           // START: avoid collision detecting car infront of you and make some action in accordance
@@ -126,40 +122,54 @@ int main() {
               car_s = end_path_s;
           }
 
-          bool too_close = false;
+          // Prediction step: here we make predictions about where the others cars are going to be
 
-//          find ref_v to use
+            bool car_ahead = false;
+            bool car_left = false;
+            bool car_right = false;
+
             for (int i = 0; i < sensor_fusion.size(); ++i) {
-                // car is in my lane
+
                 float d = sensor_fusion[i][6];
-                if (d < (2+4*lane+2) && d > (2+4*lane-2)){
-                    double vx = sensor_fusion[i][3];
-                    double vy = sensor_fusion[i][4];
-                    double check_speed = sqrt(vx*vx + vy*vy);
-                    double check_car_s = sensor_fusion[i][5];
-
-                    check_car_s += ((double) prev_size * .02 * check_speed);// if using previous points can project s value out
-                    //check svalue greater than mine and s gap
-                    if ((check_car_s > car_s) && ((check_car_s - car_s) < 30)){
-                        //Do some logic here, lower reference velocity, so we don't crash into the car in front of us, could also flag to try to change lanes
-//                         ref_vel = 29.5; //mph
-                        too_close = true;
-                        if (lane > 0){
-                            lane = 0;
-                        }
-                    }
+                if (d < 0) {
+                    continue;
                 }
+                double vx = sensor_fusion[i][3];
+                double vy = sensor_fusion[i][4];
+                double check_speed = sqrt(vx*vx + vy*vy);
+                double check_car_s = sensor_fusion[i][5];
+
+                check_car_s += ((double) prev_size * .02 * check_speed);
+
+                // Car in my lane
+                if ( d < (2+4*lane+2) && d > (2+4*lane-2) ) {
+                    // Is the car too close?
+                    car_ahead |= check_car_s > car_s && check_car_s - car_s < 45;
+                // Car on the left
+                } else if ( d < (2+4*lane) && d > (4*(lane-1)) ) {
+                    // Is the car on the left within a distance range with respect to my car?
+                    car_left |= car_s - 30 < check_car_s && car_s + 50 > check_car_s;
+                } else if ( d > (2+4*lane) && d < (2*4*(lane+1)+2)) { // Car on the right
+                    // Is car on the right within a distance range with respect to my car?
+                    car_right |= car_s - 30 < check_car_s && car_s + 50 > check_car_s;
+                }
+
             }
 
-//            This avoid the maxx acceleration at the very beggining. From 0 to 50 mph
+            // Behavior planning: here is the logic to change the state of the car
 
-            if(too_close){
+//            This avoid the max acceleration at the very beginning From 0 to 50 mph
+
+            if(car_ahead){
                 ref_vel -= .224;
+                if (!car_left && lane > 0 && car_speed > 30){
+                    lane --;
+                } else if(!car_right && lane < 2 && car_speed > 30){
+                    lane ++;
+                }
             } else if(ref_vel < 49.5){
-                ref_vel += .224;
+                ref_vel += MAX_ACCELERATION;
             }
-
-            //END avoid collision with car in front of us
 
 
 //          create a list of widely spaced (x,y) waypoints, evenly spaced at 30m
@@ -175,6 +185,8 @@ int main() {
             double ref_yaw = deg2rad(car_yaw);
 
             //          To achieve smoothness you need to tke into account previous x,y values
+
+            // Trajectory generation: here iis how to create a trajectory based on the state that minimizes jerk
 
             if(prev_size < 2){
 //                Use two points that make the path tangent to the car
@@ -205,7 +217,7 @@ int main() {
                 ptsy.push_back(ref_y);
             }
 
-//            In frenet and evenly 30m spaced points ahead of the starting reference
+            //            In frenet and evenly 30m spaced points ahead of the starting reference
             vector<double> next_wp0 = getXY(car_s + 30, (2 + 4 * lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
             vector<double> next_wp1 = getXY(car_s + 60, (2 + 4 * lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
             vector<double> next_wp2 = getXY(car_s + 90, (2 + 4 * lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);

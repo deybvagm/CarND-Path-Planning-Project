@@ -17,6 +17,51 @@ Each waypoint in the list contains  [x,y,s,dx,dy] values. x and y are the waypoi
 
 The highway's waypoints loop around so the frenet s value, distance along the road, goes from 0 to 6945.554.
 
+### Implementation details
+This project is composed by three main parts:
+- **A prediction step** that predicts where other cars are going to be in the future
+- **A behavior planning step** that decide what actions to do based on the predictions about other vehicles
+- **A trajectory generation step** that generates trajectories minimizing jerk.
+
+#### Prediction step
+This step is implemented in `main.cpp` from lines 129-159. There I take the sensor fusion information to calculate 
+the other vehicles s and d positions (in frenet coordinate system) in the future. With `s` and `d` I can detect if there
+is a car ahead in the same lane at a certain distance in order to consider changing lane. In this case I defined a 
+distance of 45 meters to the vehicle ahead to consider a lane change. That distance was selected in order to have 
+enough time to decrease velocity without exceeding jerk limit and also to avoid collision with the vehicle ahead.
+
+The other thing this step does is to detect if there are vehicles on the other lanes that makes the lane changing not
+safe, lines 151-157 in `main.cpp`. In this case, I consider vehicles that will be ahead of my vehicle (s coord) as well 
+as vehicles behind the ego vehicle within a certain distance (50m and 30m, respectively).
+
+
+#### Behavior planning step
+This step is implemented in `main.cpp` in lines 165-173. Here I try to change lane if there is a vehicle ahead in the
+same lane. If it is safe to change lane based on the prediction step, and also if the EGO vehicle has a velocity
+above 30 MPH, then the lane change is performed, otherwise, the vehicle reduce its velocity to avoid collision with the
+vehicle ahead. The minimum velocity of 30MPH to make a lane change was selected in order to avoid collision with other 
+vehicles behind the EGO when the lane change is performed. If there is no vehicle ahead, the car tries to reach 
+the speed limit on the current lane.
+
+
+#### Trajectory generation
+This step is implemented in `main.cpp` from lines 193-286. The code is similar to the provided by Udacity in the Q&A
+section for this project.
+Basically, I am taking the previous points given from the simulator to make the trajectory smooth and also I am 
+generating three new anchor points at distances car_s + 30, car_s + 60, car_s + 90, respectively (lines 193-233 in `main.cpp`). 
+With the anchor points a [spline](http://kluge.in-chemnitz.de/opensource/spline/) is generated (lines 247-249). 
+Finally, the previous non visited points are added to the next x,y points and new points are generated based in 
+the spline and taking into account the spacing between x points in order to reach the desired reference velocity (lines 262-287)
+
+
+#### Reflection
+This is a possible solution to the highway driving with its limitations. It could be improved by defining cost functions
+to penalize some behaviors. Also it could be improved by generating more suitable maneuvers depending on traffic behavior.
+Up to this point, the car always prefer a lane change to the left (if it is safe), regardless the traffic behavior on 
+that lane. Finally the ego car start reducing its velocity when the distance to the car ahead is 45m; this can be huge
+sometimes depending on the other car acceleration in time. It could be interesting no only have into account the 
+car ahead speed but also the acceleration to have a more realistic behavior of the other car.
+
 ## Basic Build Instructions
 
 1. Clone this repo.
